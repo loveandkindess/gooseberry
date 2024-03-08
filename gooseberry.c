@@ -125,6 +125,36 @@ uint8_t gooseberry_get_bin_part_info(struct gooseberry_context* context, struct 
 
 uint8_t gooseberry_peek_next_tag(struct gooseberry_context* context, struct gooseberry_tag_info* tag_info)
 {
+    if(context->format)
+    {
+        if(!gooseberry_range_within_bounds(context, 2))
+        {
+            return 0;
+        }
+
+        tag_info->format = GOOSEBERRY_TWO_OR_THREE_BYTES;
+        tag_info->big_tag = *(union gooseberry_2_or_3_byte_tag*)(context->buffer + context->index);
+
+        // This is so the read/write functions work without lots of modification.
+        // The has_extension field would be ignored by those functions when the format is the 2 or 3 byte one.
+        tag_info->tag = *(union gooseberry_tag*)(context->buffer + context->index);
+        tag_info->extension = *(union gooseberry_tag_extension*)(context->buffer + context->index + 1);
+
+        if(tag_info->big_tag.bits.extra_class_byte)
+        {
+            if(!gooseberry_range_within_bounds(context, 3))
+            {
+                return 0;
+            }
+
+            tag_info->extra_class_byte = *(uint8_t*)(context->buffer + context->index + 2);
+        }
+
+        return 1;
+    }
+
+    tag_info->format = GOOSEBERRY_ONE_OR_TWO_BYTES;
+
     if(!gooseberry_range_within_bounds(context, 1))
     {
         return 0;
@@ -147,6 +177,29 @@ uint8_t gooseberry_peek_next_tag(struct gooseberry_context* context, struct goos
 
 uint8_t gooseberry_tag_within_bounds(struct gooseberry_context* context, struct gooseberry_tag_info* tag_info)
 {
+    if(context->format)
+    {
+        if(!gooseberry_range_within_bounds(context, 2))
+        {
+            return 0;
+        }
+
+        tag_info->big_tag = *(union gooseberry_2_or_3_byte_tag*)(context->buffer + context->index);
+        tag_info->total_size += 2;
+
+        if(tag_info->big_tag.bits.extra_class_byte)
+        {
+            if(!gooseberry_range_within_bounds(context, 3))
+            {
+                return 0;
+            }
+
+            tag_info->extra_class_byte = *(uint8_t*)(context->buffer + context->index + 2);
+            tag_info->total_size += 1;
+        }
+    }
+
+
     if(!gooseberry_range_within_bounds(context, 1))
     {
         return 0;
@@ -203,10 +256,40 @@ uint8_t gooseberry_try_write_tag(struct gooseberry_context* context, struct goos
         return 0;
     }
 
+    uint8_t has_name = 0;
+
+    if(!context->format)
+    {
+        if(!gooseberry_range_within_bounds(context, 2))
+        {
+            return 0;
+        }
+
+        *(union gooseberry_2_or_3_byte_tag*)(context->buffer + context->index) = tag_info->big_tag;
+        context->index += 2;
+
+        if(tag_info->big_tag.bits.has_name)
+        {
+            has_name = 1;
+        }
+
+        if(tag_info->big_tag.bits.extra_class_byte)
+        {
+            if(!gooseberry_range_within_bounds(context, 3))
+            {
+                return 0;
+            }
+
+            *(uint8_t*)(context->buffer + context->index) = tag_info->extra_class_byte;
+            context->index++;
+        }
+
+        goto skip;
+    }
+
     *(union gooseberry_tag*)(context->buffer + context->index) = tag_info->tag;
     context->index++;
 
-    uint8_t has_name = 0;
 
     if(tag_info->tag.bits.has_extension)
     {
@@ -223,6 +306,8 @@ uint8_t gooseberry_try_write_tag(struct gooseberry_context* context, struct goos
             has_name = 1;
         }
     }
+
+    skip:
 
     if(has_name)
     {
@@ -261,6 +346,46 @@ uint8_t gooseberry_try_write_tag(struct gooseberry_context* context, struct goos
 
 uint8_t gooseberry_try_read_next_tag(struct gooseberry_context* context, struct gooseberry_tag_info* tag_info)
 {
+    uint8_t has_name = 0;
+
+    if(!context->format)
+    {
+        if(!gooseberry_range_within_bounds(context, 2))
+        {
+            return 0;
+        }
+        
+        tag_info->format = GOOSEBERRY_TWO_OR_THREE_BYTES;
+        tag_info->big_tag = *(union gooseberry_2_or_3_byte_tag*)(context->buffer + context->index);
+        
+        tag_info->total_size += 2;
+        context->index += 2;
+
+        // This is so the read/write functions work without lots of modification.
+        // The has_extension field would be ignored by those functions when the format is the 2 or 3 byte one.
+        tag_info->tag = *(union gooseberry_tag*)(context->buffer + context->index);
+        tag_info->extension = *(union gooseberry_tag_extension*)(context->buffer + context->index + 1);
+
+        if(tag_info->big_tag.bits.has_name)
+        {
+            has_name = 1;
+        }
+
+        if(tag_info->big_tag.bits.extra_class_byte)
+        {
+            if(!gooseberry_range_within_bounds(context, 3))
+            {
+                return 0;
+            }
+
+            *(uint8_t*)(context->buffer + context->index) = tag_info->extra_class_byte;
+            tag_info->total_size++;
+            context->index++;
+        }
+
+        goto skip;
+    }
+
     if(!gooseberry_range_within_bounds(context, 1))
     {
         return 0;
@@ -271,7 +396,6 @@ uint8_t gooseberry_try_read_next_tag(struct gooseberry_context* context, struct 
     tag_info->tag = *(union gooseberry_tag*)(context->buffer + context->index);
     context->index++;
 
-    uint8_t has_name = 0;
 
     if(tag_info->tag.bits.has_extension)
     {
@@ -289,6 +413,8 @@ uint8_t gooseberry_try_read_next_tag(struct gooseberry_context* context, struct 
             has_name = 1;
         }
     }
+    
+    skip:
 
     if(has_name)
     {

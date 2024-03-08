@@ -1,7 +1,7 @@
 #include <stdint.h>
 
-#define GOOSEBERRY_LIBRARY_VERSION 1
-#define GOOSEBERRY_FORMAT_VERSION 1
+#define GOOSEBERRY_LIBRARY_VERSION 2
+#define GOOSEBERRY_FORMAT_VERSION 2
 
 #define GOOSEBERRY_HEADER "Gooseberry"
 #define GOOSEBERRY_ENDIANNESS_TEST 0x01020304 // This is intended to be a uint32_t
@@ -21,6 +21,11 @@ void gooseberry_memset(void* buffer, uint8_t byte, uintptr size);
 void gooseberry_memcpy(void* from, void* to, uintptr size);
 
 
+enum GOOSEBERRY_FORMAT_TYPE
+{
+    GOOSEBERRY_ONE_OR_TWO_BYTES = 0,
+    GOOSEBERRY_TWO_OR_THREE_BYTES = 1
+};
 
 enum GOOSEBERRY_TYPE
 {
@@ -30,8 +35,8 @@ enum GOOSEBERRY_TYPE
     GOOSEBERRY_TYPE_BFLOAT = 3,
     GOOSEBERRY_TYPE_POSIT = 4,
     GOOSEBERRY_TYPE_QUIRE = 5,
-    GOOSEBERRY_TYPE_ARRAY = 6, // Indicates there is supposed to be XYZ types ahead
-    GOOSEBERRY_TYPE_BIN = 7 // You can use this as a string
+    GOOSEBERRY_TYPE_ARRAY = 6, // Indicates there is supposed to be XYZ types ahead.
+    GOOSEBERRY_TYPE_BIN = 7 // You can use this as a string.
 };
 
 enum GOOSEBERRY_SIZE
@@ -53,6 +58,14 @@ enum GOOSEBERRY_SIZE
     GOOSEBERRY_SIZE_384 = 13,
     GOOSEBERRY_SIZE_768 = 14,
     GOOSEBERRY_SIZE_2048 = 15
+};
+
+enum GOOSEBERRY_ENDIANESS
+{
+    GOOSEBERRY_LITTLE_ENDIAN = 0,
+    GOOSEBERRY_BIG_ENDIAN = 1,
+    GOOSEBERRY_HONEYWELL_ENDIAN = 2,
+    GOOSEBERRY_PDP_ENDIAN = 3
 };
 
 uintptr GOOSEBERRY_TYPE_SIZES[16] = { 1, 2, 4, 8,
@@ -84,12 +97,33 @@ union gooseberry_tag_extension
     } bits;
 };
 
+union gooseberry_2_or_3_byte_tag
+{
+    uint16_t byte;
+    struct
+    {
+        uint8_t type : 3;
+        uint8_t size : 4;
+        uint8_t extra_class_byte : 1; // This byte can be anything, it's up to you..
+
+        uint8_t has_name : 1;
+        uint8_t name_hash_size : 4;
+        uint8_t is_nested : 1; // Does this contain another Gooseberry tag?
+        uint8_t endianess : 2;
+    } bits;
+};
+
 struct gooseberry_tag_info
 {
+    uint8_t format;
+
     uint8_t* buffer;
 
     union gooseberry_tag tag;
     union gooseberry_tag_extension extension;
+
+    union gooseberry_2_or_3_byte_tag big_tag;
+    uint8_t extra_class_byte;
 
     uint8_t* hash;
 
@@ -104,6 +138,8 @@ struct gooseberry_tag_info
 
 struct gooseberry_context
 {
+    uint8_t format;
+
     uint8_t* buffer;
     uintptr index;
     uintptr size;

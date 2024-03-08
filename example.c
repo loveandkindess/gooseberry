@@ -17,10 +17,13 @@ void gooseberry_hash_wrapper(uint8_t* name, uintptr name_size, uint8_t* hash_out
 
 int main()
 {
+    // This doesn't test the 2 or 3 byte format yet..
+
     uint8_t bytes[1000];
 
     // Carefully set the size and limit to avoid any bugs.
     struct gooseberry_context context = { 0 };
+    context.format = GOOSEBERRY_ONE_OR_TWO_BYTES;
     context.buffer = &bytes;
     context.size = 1000;
     context.max_tag_count = 70; 
@@ -150,4 +153,6 @@ int main()
         // When there's an error, "reset" the context (and tag_info sometimes with other functions).
         // Zero everything except the buffer, size, and max_tag_count.
     }
+
+    return 0;
 }
