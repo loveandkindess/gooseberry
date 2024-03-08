@@ -139,7 +139,7 @@ uint8_t gooseberry_peek_next_tag(struct gooseberry_context* context, struct goos
             return 0;
         }
 
-        tag_info->extension = *(union gooseberry_tag_extension*)(context->buffer + context->index);
+        tag_info->extension = *(union gooseberry_tag_extension*)(context->buffer + context->index + 1);
     }
 
     return 1;
