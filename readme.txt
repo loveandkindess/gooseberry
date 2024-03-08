@@ -6,6 +6,13 @@ I ask you all to port this to other programming languages.
 
 Unlike Protobufs and Avro, Gooseberry is very simple and will always be. Let's go straight to the encoding.
 
+There are 2 formats, but we will go over the first one.
+enum GOOSEBERRY_FORMAT_TYPE
+{
+    GOOSEBERRY_ONE_OR_TWO_BYTES = 0,
+    GOOSEBERRY_TWO_OR_THREE_BYTES = 1
+};
+
 Gooseberry has 8 types:
 enum GOOSEBERRY_TYPE
 {
@@ -68,6 +75,35 @@ union gooseberry_tag_extension
         uint8_t is_little_endian : 1; // If not, the data is most likely big endian.
     } bits;
 };
+
+Now let's get to the second format.
+enum GOOSEBERRY_ENDIANESS
+{
+    GOOSEBERRY_LITTLE_ENDIAN = 0,
+    GOOSEBERRY_BIG_ENDIAN = 1,
+    GOOSEBERRY_HONEYWELL_ENDIAN = 2,
+    GOOSEBERRY_PDP_ENDIAN = 3
+};
+
+union gooseberry_2_or_3_byte_tag
+{
+    uint16_t byte;
+    struct
+    {
+        uint8_t type : 3;
+        uint8_t size : 4;
+        uint8_t extra_class_byte : 1; // This byte can be anything, it's up to you..
+
+        uint8_t has_name : 1;
+        uint8_t name_hash_size : 4;
+        uint8_t is_nested : 1; // Does this contain another Gooseberry tag?
+        uint8_t endianess : 2;
+    } bits;
+};
+
+The extra class byte is an extra byte of your choosing. It is intended to serve as an extra identifier.
+With this second format, you are supposed to know the endianess of the data.
+There's additional options such as Honeywell or PDP endianess.
 
 If has_name is set, the next bytes are a hash of one of the 16 sizes. As of Feb. 5 2024, I recommend BLAKE3-512 (XOF), SHA3-512, or xxHash3 (non-cryptographic).
 
