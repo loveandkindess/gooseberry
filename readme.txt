@@ -1,3 +1,4 @@
+THI IS BROKEN! DONT USE
 Gooseberry is a data serialization format like MessagePack, Protobufs, and Avro. Gooseberry supports a wider range of number formats, including bfloat16 and Unums (posits and quires). Various number sizes ranging from 8 to 2048 bits (yes!) are supported.
 
 I have implemented this in C, due to performance and the native support of unions and bit fields.
